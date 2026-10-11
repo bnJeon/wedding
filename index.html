@@ -98,8 +98,11 @@ form { display: grid; gap: 12px; background: var(--leaf); border-radius: 14px; p
 .seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .seg label { text-align: center; border: 1px solid var(--line); border-radius: 10px; padding: 9px 4px; background: var(--paper); cursor: pointer; font-size: .9rem; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
-.seg input:checked + span { color: var(--olive); font-weight: 700; }
-.seg label:has(input:checked) { border-color: var(--olive); }
+/* 선택된 버튼은 색을 채우고 ✓를 붙여서, 휴대폰 다크모드에서도 구분돼요 */
+.seg label:has(input:checked) { background: var(--olive); border-color: var(--olive); color: var(--paper); font-weight: 700; }
+.seg input:checked + span { color: var(--paper); font-weight: 700; }
+.seg input:checked + span::before { content: "✓ "; }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--blossom); outline-offset: 2px; }
 .field { display: grid; gap: 4px; font-size: .85rem; color: var(--sub); }
 .field input, .field select { font: inherit; font-size: .95rem; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--paper); width: 100%; box-sizing: border-box; }
 .submit { background: var(--olive); color: var(--paper); border: 0; border-radius: 10px; padding: 12px; font: inherit; font-weight: 700; cursor: pointer; }
