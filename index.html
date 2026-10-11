@@ -235,10 +235,10 @@ body.lock { overflow: hidden; }
         <label><input type="radio" name="att" id="att-n" value="불참"><span>어려워요</span></label>
       </div>
       <label class="field" for="rname">성함<input id="rname" type="text" placeholder="예: 홍길동" autocomplete="name"></label>
-      <label class="field" for="rcount">함께 오시는 인원 (본인 포함)<select id="rcount"><option>1명</option><option>2명</option><option>3명</option><option>4명</option><option>5명</option><option>6명</option><option>7명</option><option>8명</option><option>9명</option><option>10명</option><option value="기타">기타 (직접 입력)</option></select></label>
+      <label class="field" for="rmeal" id="rmealWrap">식사 여부<select id="rmeal"><option>식사해요</option><option>식사 안 해요</option><option>아직 몰라요</option></select></label>
+      <label class="field" for="rcount" id="rcountWrap">함께 오시는 인원 (본인 포함)<select id="rcount"><option>1명</option><option>2명</option><option>3명</option><option>4명</option><option>5명</option><option>6명</option><option>7명</option><option>8명</option><option>9명</option><option>10명</option><option value="기타">기타 (직접 입력)</option></select></label>
       <label class="field" for="rcountEtc" id="rcountEtcWrap" hidden>인원을 숫자로 적어 주세요<input id="rcountEtc" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="예: 12" autocomplete="off"></label>
-      <label class="field" for="rmeal">식사 여부<select id="rmeal"><option>식사해요</option><option>식사 안 해요</option><option>아직 몰라요</option></select></label>
-      <label class="field" for="rbus">성남 대절버스<select id="rbus"><option>안 타요</option><option>성남 대절버스 탈게요</option></select></label>
+      <label class="field" for="rbus" id="rbusWrap">성남 대절버스<select id="rbus"><option>안 타요</option><option>성남 대절버스 탈게요</option></select></label>
       <button type="submit" class="submit">참석 의사 전달하기</button>
       <p class="msg" id="rmsg" role="status"></p>
     </form>
@@ -327,10 +327,19 @@ document.getElementById("copyAddr").addEventListener("click", (e) => {
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwit3QX_batGnmnjEou-YBc-KkJwxz1pRplP4rdmu1s2fjeQCr-AwswB5Ykp_5XkDAxWg/exec";
 // 인원에서 '기타'를 고르면 숫자 입력칸이 나타나요. 숫자 말고는 입력되지 않아요.
 const countSel = document.getElementById("rcount"), countEtc = document.getElementById("rcountEtc"), countEtcWrap = document.getElementById("rcountEtcWrap");
-countSel.addEventListener("change", () => {
-  countEtcWrap.hidden = countSel.value !== "기타";
-  if (!countEtcWrap.hidden) countEtc.focus(); else { countEtc.value = ""; countEtc.removeAttribute("aria-invalid"); }
-});
+// 어려워요 → 성함만, 식사 안 해요 → 인원 숨김. 숨긴 칸은 검사하지 않고 빈 값으로 보내요.
+const rsvpForm = document.getElementById("rsvp"), mealSel = document.getElementById("rmeal");
+const wraps = { meal: document.getElementById("rmealWrap"), count: document.getElementById("rcountWrap"), bus: document.getElementById("rbusWrap") };
+const shown = (el) => !el.hidden;
+function syncRsvp() {
+  const absent = rsvpForm.att.value === "불참";
+  wraps.meal.hidden = wraps.bus.hidden = absent;
+  wraps.count.hidden = absent || mealSel.value === "식사 안 해요";
+  countEtcWrap.hidden = wraps.count.hidden || countSel.value !== "기타";
+  if (countEtcWrap.hidden) countEtc.removeAttribute("aria-invalid");
+}
+rsvpForm.addEventListener("change", syncRsvp);
+countSel.addEventListener("change", () => { if (countSel.value === "기타") countEtc.focus(); else countEtc.value = ""; });
 countEtc.addEventListener("input", () => { countEtc.value = countEtc.value.replace(/\D/g, ""); countEtc.removeAttribute("aria-invalid"); });
 document.getElementById("rname").addEventListener("input", (e) => e.target.removeAttribute("aria-invalid"));
 document.getElementById("rsvp").addEventListener("submit", async (e) => {
@@ -341,8 +350,8 @@ document.getElementById("rsvp").addEventListener("submit", async (e) => {
   [nameEl, countEtc].forEach((el) => el.removeAttribute("aria-invalid"));
   const fail = (el, text) => { el.setAttribute("aria-invalid", "true"); el.focus(); msg.textContent = text; };
   if (!name) return fail(nameEl, "성함을 적어 주세요.");
-  let count = countSel.value;
-  if (f.att.value === "참석" && count === "기타") {
+  let count = shown(wraps.count) ? countSel.value : "";
+  if (shown(countEtcWrap)) {
     const n = parseInt(countEtc.value, 10);
     if (!countEtc.value) return fail(countEtc, "오시는 인원을 숫자로 적어 주세요.");
     if (!(n >= 1 && n <= 999)) return fail(countEtc, "인원은 1 이상의 숫자로 적어 주세요.");
@@ -352,15 +361,15 @@ document.getElementById("rsvp").addEventListener("submit", async (e) => {
   const data = {
     side: f.side.value, attend: f.att.value, name,
     count,
-    meal: document.getElementById("rmeal").value,
-    bus: document.getElementById("rbus").value,
+    meal: shown(wraps.meal) ? mealSel.value : "",
+    bus: shown(wraps.bus) ? document.getElementById("rbus").value : "",
   };
   btn.disabled = true; msg.textContent = "전달하는 중이에요…";
   try {
     // text/plain으로 보내면 브라우저 사전 확인 없이 Apps Script로 바로 전달돼요.
     await fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(data) });
     msg.textContent = data.attend === "참석" ? `${name}님, 고마워요. 그날 뵐게요!` : `${name}님, 마음 전해 주셔서 고마워요.`;
-    f.reset(); countEtcWrap.hidden = true;
+    f.reset(); syncRsvp();
   } catch (err) {
     msg.textContent = "전달이 안 됐어요. 잠시 후 다시 눌러 주세요.";
   } finally { btn.disabled = false; }
